@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiMo-V2-TTS · 语音合成</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#06080d;--bg2:#0a0e16;
+  --sf:#0f1320;--sf2:#151a2a;--sf3:#1c2236;
+  --bd:#1e2540;--bd2:#2a3258;
+  --t1:#d8dce8;--t2:#8890a8;--t3:#505878;
+  --cy:#00e5ff;--cy2:#00e5ff18;--cy3:#00e5ff40;
+  --mg:#e040fb;--mg2:#e040fb18;
+  --gn:#00e676;--gn2:#00e67618;
+  --am:#ffc400;--am2:#ffc40018;
+  --rd:#ff5252;
+  --r:14px;--r2:10px;--r3:6px;
+  --f:'Noto Sans SC',sans-serif;
+  --fm:'DM Mono',monospace;
+  --fd:'Space Grotesk','Noto Sans SC',sans-serif;
+}
+html{font-size:15px}
+body{background:var(--bg);color:var(--t1);font-family:var(--f);min-height:100vh;overflow-x:hidden;line-height:1.65}
+.bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(0,229,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.025) 1px,transparent 1px);
+  background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,black,transparent)}
+body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity:.018}
+.orb{position:fixed;border-radius:50%;filter:blur(120px);pointer-events:none;z-index:0}
+.orb-1{width:500px;height:500px;background:var(--cy);opacity:.04;top:-150px;right:-100px;animation:of 20s ease-in-out infinite}
+.orb-2{width:400px;height:400px;background:var(--mg);opacity:.03;bottom:-100px;left:-80px;animation:of 25s ease-in-out infinite reverse}
+@keyframes of{0%,100%{transform:translate(0,0)}33%{transform:translate(30px,-20px)}66%{transform:translate(-20px,30px)}}
+.app{position:relative;z-index:2;max-width:1260px;margin:0 auto;padding:32px 28px 80px}
+.hdr{margin-bottom:36px;opacity:0;animation:sd .8s cubic-bezier(.16,1,.3,1) forwards}
+@keyframes sd{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:translateY(0)}}
+.hdr-t{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.logo{width:38px;height:38px;border-radius:var(--r2);background:linear-gradient(135deg,var(--cy),var(--mg));display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:700;font-size:.95rem;color:var(--bg);flex-shrink:0}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border-radius:100px;background:var(--cy2);border:1px solid var(--cy3);font-family:var(--fm);font-size:.66rem;color:var(--cy);letter-spacing:.08em;text-transform:uppercase}
+.badge .dot{width:5px;height:5px;border-radius:50%;background:var(--gn);box-shadow:0 0 6px var(--gn);animation:bl 2s ease infinite}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}
+.hdr h1{font-family:var(--fd);font-size:2.4rem;font-weight:300;line-height:1.1;letter-spacing:-.03em;margin-bottom:5px}
+.hdr h1 b{font-weight:700;background:linear-gradient(135deg,var(--cy),var(--mg));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hdr .sub{font-size:.85rem;color:var(--t2);max-width:580px;line-height:1.7}
+.sbar{display:flex;align-items:center;gap:10px;padding:9px 15px;margin-bottom:18px;background:var(--sf);border:1px solid var(--bd);border-radius:var(--r2);font-family:var(--fm);font-size:.7rem;color:var(--t2);opacity:0;animation:su .6s ease .2s forwards}
+.sd{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sd.on{background:var(--gn);box-shadow:0 0 8px rgba(0,230,118,.5)}
+@keyframes su{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.grid{display:grid;grid-template-columns:1fr 400px;gap:18px;align-items:start}
+@media(max-width:960px){.grid{grid-template-columns:1fr}}
+.pnl{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;opacity:0;animation:su .6s ease forwards}
+.pnl:nth-child(1){animation-delay:.12s}
+.pnl:nth-child(2){animation-delay:.22s}
+.pnl-h{display:flex;align-items:center;gap:9px;padding:13px 20px;border-bottom:1px solid var(--bd);font-family:var(--fm);font-size:.7rem;color:var(--t2);letter-spacing:.07em;text-transform:uppercase}
+.pnl-h .ic{font-size:.9rem}
+.pnl-b{padding:20px}
+.ta-w{position:relative;margin-bottom:14px}
+.ta{width:100%;min-height:140px;max-height:360px;padding:15px 17px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r2);color:var(--t1);font-family:var(--f);font-size:.9rem;line-height:1.75;resize:vertical;transition:border-color .2s,box-shadow .2s}
+.ta:focus{outline:none;border-color:var(--cy3);box-shadow:0 0 0 3px var(--cy2)}
+.ta::placeholder{color:var(--t3)}
+.cn{position:absolute;bottom:10px;right:13px;font-family:var(--fm);font-size:.66rem;color:var(--t3)}
+.sl{font-family:var(--fm);font-size:.66rem;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.chip{padding:5px 12px;border-radius:100px;background:var(--sf3);border:1px solid var(--bd);font-size:.76rem;color:var(--t2);cursor:pointer;transition:all .2s;user-select:none}
+.chip:hover{border-color:var(--bd2);color:var(--t1)}
+.chip.on{background:var(--cy2);border-color:var(--cy);color:var(--cy)}
+.ci{width:100%;padding:9px 13px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r2);color:var(--t1);font-family:var(--f);font-size:.82rem;transition:border-color .2s,box-shadow .2s;margin-bottom:12px}
+.ci:focus{outline:none;border-color:var(--cy3);box-shadow:0 0 0 3px var(--cy2)}
+.ci::placeholder{color:var(--t3)}
+.snd{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px}
+.sb{display:flex;align-items:center;gap:4px;padding:5px 10px;background:var(--sf3);border:1px solid var(--bd);border-radius:var(--r3);font-size:.74rem;color:var(--t2);cursor:pointer;transition:all .2s}
+.sb:hover{border-color:var(--cy);color:var(--cy);background:var(--cy2)}
+.cg{margin-bottom:16px}.cg:last-child{margin-bottom:0}
+.cl{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:.78rem;color:var(--t2)}
+.cl .v{font-family:var(--fm);font-size:.7rem;color:var(--cy)}
+input[type="range"]{-webkit-appearance:none;width:100%;height:3px;background:var(--sf3);border-radius:2px;outline:none}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;background:var(--cy);border-radius:50%;cursor:pointer;box-shadow:0 0 10px var(--cy3);transition:transform .15s}
+input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.25)}
+input[type="range"]::-moz-range-thumb{width:14px;height:14px;background:var(--cy);border:none;border-radius:50%;cursor:pointer}
+.sel{width:100%;padding:9px 13px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r2);color:var(--t1);font-family:var(--f);font-size:.82rem;cursor:pointer;outline:none;transition:border-color .2s}
+.sel:focus{border-color:var(--cy3)}
+.ak-w{position:relative;margin-bottom:12px}
+.ak{width:100%;padding:9px 34px 9px 13px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r2);color:var(--t1);font-family:var(--fm);font-size:.74rem;letter-spacing:.02em;transition:border-color .2s,box-shadow .2s}
+.ak:focus{outline:none;border-color:var(--cy3);box-shadow:0 0 0 3px var(--cy2)}
+.ak-t{position:absolute;right:9px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--t3);cursor:pointer;font-size:.8rem;padding:4px}
+.gbtn{width:100%;padding:13px;border:none;border-radius:var(--r2);background:linear-gradient(135deg,var(--cy),#00b8d4);color:var(--bg);font-family:var(--fd);font-size:.9rem;font-weight:600;cursor:pointer;transition:all .25s;letter-spacing:.02em;position:relative;overflow:hidden}
+.gbtn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,.15) 50%,transparent 60%);transform:translateX(-100%);transition:transform .6s}
+.gbtn:hover::before{transform:translateX(100%)}
+.gbtn:hover{transform:translateY(-1px);box-shadow:0 8px 28px var(--cy3)}
+.gbtn:active{transform:translateY(0)}
+.gbtn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+.gbtn:disabled::before{display:none}
+.gbtn .sp{display:none;width:15px;height:15px;border:2px solid transparent;border-top-color:var(--bg);border-radius:50%;animation:sp .7s linear infinite;margin-right:7px;vertical-align:middle}
+.gbtn.ld .sp{display:inline-block}.gbtn.ld .bt{opacity:.7}
+@keyframes sp{to{transform:rotate(360deg)}}
+.ra{margin-top:20px;display:none}
+.ra.vis{display:block;animation:su .5s ease forwards}
+.rc{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:18px 20px}
+.rh{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
+.rt{font-family:var(--fm);font-size:.72rem;color:var(--gn);letter-spacing:.06em;text-transform:uppercase}
+.dl{padding:6px 13px;background:var(--sf3);border:1px solid var(--bd);border-radius:var(--r3);color:var(--t2);font-family:var(--fm);font-size:.7rem;cursor:pointer;transition:all .2s;text-decoration:none;white-space:nowrap}
+.dl:hover{border-color:var(--cy);color:var(--cy)}
+.pl{display:flex;align-items:center;gap:11px;padding:13px 16px;background:var(--bg2);border-radius:var(--r2);border:1px solid var(--bd)}
+.pb{width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:var(--cy);border:none;border-radius:50%;cursor:pointer;flex-shrink:0;transition:all .2s;font-size:1rem;color:var(--bg)}
+.pb:hover{transform:scale(1.08);box-shadow:0 4px 18px var(--cy3)}
+.pw{flex:1;display:flex;flex-direction:column;gap:4px}
+.pbr{width:100%;height:4px;background:var(--sf3);border-radius:2px;overflow:hidden;cursor:pointer}
+.pf{height:100%;background:var(--cy);border-radius:2px;width:0%;transition:width .1s linear}
+.td{display:flex;justify-content:space-between;font-family:var(--fm);font-size:.66rem;color:var(--t3)}
+.ui{display:flex;gap:14px;margin-top:10px;padding:9px 13px;background:var(--bg2);border-radius:var(--r2);border:1px solid var(--bd);font-family:var(--fm);font-size:.66rem;color:var(--t3)}
+.ui .uv{color:var(--cy)}
+.la{margin-top:14px;display:none}
+.la.vis{display:block;animation:su .4s ease}
+.lb{max-height:240px;overflow-y:auto;padding:11px 13px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r2);font-family:var(--fm);font-size:.68rem;line-height:1.9;color:var(--t3)}
+.lb .l{margin-bottom:1px;word-break:break-all}
+.lb .rq{color:var(--cy)}.lb .rs{color:var(--gn)}.lb .er{color:var(--rd)}.lb .nf{color:var(--am)}
+.hs{margin-top:26px;display:none}
+.hs.vis{display:block;animation:su .5s ease}
+.hl{display:flex;flex-direction:column;gap:6px}
+.hi{display:flex;align-items:center;gap:11px;padding:10px 13px;background:var(--sf);border:1px solid var(--bd);border-radius:var(--r2);cursor:pointer;transition:all .2s}
+.hi:hover{border-color:var(--bd2);background:var(--sf2)}
+.hp{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:var(--cy2);border:1px solid var(--cy3);border-radius:50%;color:var(--cy);font-size:.7rem;flex-shrink:0;cursor:pointer;transition:all .2s}
+.hp:hover{background:var(--cy);color:var(--bg)}
+.hf{flex:1;min-width:0}
+.ht{font-size:.78rem;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm{font-family:var(--fm);font-size:.63rem;color:var(--t3);margin-top:2px}
+.tt{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(100px);padding:11px 20px;background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r2);font-size:.82rem;color:var(--t1);z-index:1000;transition:transform .4s cubic-bezier(.16,1,.3,1);pointer-events:none;max-width:88vw}
+.tt.show{transform:translateX(-50%) translateY(0)}
+.tt.er{border-color:var(--rd);color:var(--rd)}
+.tt.ok{border-color:var(--gn);color:var(--gn)}
+.sep{height:1px;background:var(--bd);margin:13px 0}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px}
+
+/* 风格预设示例 */
+.ex-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.ex-chip{padding:5px 11px;border-radius:var(--r3);background:var(--mg2);border:1px solid rgba(224,64,251,.2);font-size:.72rem;color:var(--mg);cursor:pointer;transition:all .2s;user-select:none}
+.ex-chip:hover{border-color:var(--mg);background:rgba(224,64,251,.1)}
+
+/* 风格预览条 */
+.style-bar{padding:10px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r2);font-family:var(--fm);font-size:.7rem;color:var(--t2);line-height:1.7;margin-bottom:14px;min-height:38px}
+.style-bar .tag{display:inline-block;padding:1px 7px;background:var(--cy2);border:1px solid var(--cy3);border-radius:4px;color:var(--cy);margin:1px 2px;font-size:.68rem}
+
+/* 请求预览 */
+.preview-box{padding:10px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r2);font-family:var(--fm);font-size:.68rem;color:var(--t3);line-height:1.8;margin-bottom:16px;max-height:180px;overflow-y:auto;word-break:break-all}
+
+@media(max-width:600px){.app{padding:18px 14px 60px}.hdr h1{font-size:1.8rem}.pnl-b{padding:15px}.grid{gap:14px}}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<div class="app">
+  <header class="hdr">
+    <div class="hdr-t">
+      <div class="logo">M</div>
+      <div class="badge"><span class="dot"></span> MiMo-V2-TTS</div>
+    </div>
+    <h1>语音合成<b>工作台</b></h1>
+    <p class="sub">小米自研多码本语音-文本联合建模。风格标签支持任意自然语言描述，多选组合，自由搭配。</p>
+  </header>
+
+  <div class="sbar">
+    <span class="sd on" id="sD"></span>
+    <span id="sT">直连模式 · api.xiaomimimo.com</span>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="pnl">
+        <div class="pnl-h"><span class="ic">✍️</span> 文本与风格</div>
+        <div class="pnl-b">
+          <div class="ta-w">
+            <textarea class="ta" id="txt" placeholder="输入要合成的文本……">你好，我是小米 MiMo 语音合成大模型，很高兴认识你！今天天气真不错呢。</textarea>
+            <span class="cn"><span id="cc">0</span> 字</span>
+          </div>
+
+          <!-- 风格预览条 -->
+          <div class="sl">当前风格预览</div>
+          <div class="style-bar" id="styleBar"><span style="color:var(--t3)">（默认音色，无风格修饰）</span></div>
+
+          <!-- 风格选择（多选） -->
+          <div class="sl">发音风格（可多选组合）</div>
+          <div class="chips" id="eC">
+            <div class="chip on" data-v="">默认</div>
+            <div class="chip" data-v="开心">😄 开心</div>
+            <div class="chip" data-v="悲伤">😢 悲伤</div>
+            <div class="chip" data-v="生气">😡 生气</div>
+            <div class="chip" data-v="温柔">🥰 温柔</div>
+            <div class="chip" data-v="严肃">🧐 严肃</div>
+            <div class="chip" data-v="慵懒">😴 慵懒</div>
+            <div class="chip" data-v="悄悄话">🤫 悄悄话</div>
+            <div class="chip" data-v="夹子音">🎀 夹子音</div>
+            <div class="chip" data-v="语速加快">⏩ 快速</div>
+            <div class="chip" data-v="语速变慢">⏪ 慢速</div>
+            <div class="chip" data-v="慷慨激昂">🔥 激昂</div>
+          </div>
+
+          <!-- 性别/年龄（多选） -->
+          <div class="sl">音色特征（可多选）</div>
+          <div class="chips" id="vC">
+            <div class="chip" data-v="男声">👦 男声</div>
+            <div class="chip" data-v="女声">👧 女声</div>
+            <div class="chip" data-v="儿童">🧒 儿童</div>
+            <div class="chip" data-v="少年">🧑 少年</div>
+            <div class="chip" data-v="中年">👨 中年</div>
+            <div class="chip" data-v="老年">👴 老年</div>
+            <div class="chip" data-v="温柔嗓音">🎵 温柔</div>
+            <div class="chip" data-v="粗犷嗓音">🪨 粗犷</div>
+            <div class="chip" data-v="沙哑嗓音">🌫️ 沙哑</div>
+            <div class="chip" data-v="清脆嗓音">🔔 清脆</div>
+            <div class="chip" data-v="低沉嗓音">🎻 低沉</div>
+            <div class="chip" data-v="甜美嗓音">🍬 甜美</div>
+          </div>
+
+          <!-- 方言 -->
+          <div class="sl">方言</div>
+          <div class="chips" id="dC">
+            <div class="chip on" data-v="">标准普通话</div>
+            <div class="chip" data-v="东北话">东北话</div>
+            <div class="chip" data-v="四川话">四川话</div>
+            <div class="chip" data-v="河南话">河南话</div>
+            <div class="chip" data-v="粤语">粤语</div>
+            <div class="chip" data-v="台湾腔">台湾腔</div>
+            <div class="chip" data-v="上海话">上海话</div>
+            <div class="chip" data-v="陕西话">陕西话</div>
+            <div class="chip" data-v="湖南话">湖南话</div>
+            <div class="chip" data-v="天津话">天津话</div>
+            <div class="chip" data-v="山东话">山东话</div>
+            <div class="chip" data-v="闽南语">闽南语</div>
+          </div>
+
+          <!-- 角色 -->
+          <div class="sl">角色扮演</div>
+          <div class="chips" id="rC">
+            <div class="chip on" data-v="">无</div>
+            <div class="chip" data-v="孙悟空">🐵 孙悟空</div>
+            <div class="chip" data-v="林黛玉">🌸 林黛玉</div>
+            <div class="chip" data-v="新闻主播">📺 新闻主播</div>
+            <div class="chip" data-v="卡通角色">🎈 卡通角色</div>
+            <div class="chip" data-v="老爷爷">👴 老爷爷</div>
+            <div class="chip" data-v="机器人">🤖 机器人</div>
+            <div class="chip" data-v="解说员">🎙️ 解说员</div>
+          </div>
+
+          <!-- 模式 -->
+          <div class="sl">合成模式</div>
+          <div class="chips" id="mC">
+            <div class="chip on" data-v="speech">🎙️ 语音</div>
+            <div class="chip" data-v="sing">🎵 唱歌</div>
+          </div>
+
+          <!-- 自定义风格 -->
+          <div class="sl">自定义风格描述（追加到上方选择之后，任意自然语言）</div>
+          <input type="text" class="ci" id="cs" placeholder='例："中年男人 粗犷的嗓音"、"刚睡醒 迷迷糊糊"、"播音腔 字正腔圆"'>
+          <div class="ex-row">
+            <div class="ex-chip" data-v="中年男人 粗犷嗓音">中年男人 粗犷嗓音</div>
+            <div class="ex-chip" data-v="刚睡醒 迷迷糊糊">刚睡醒 迷迷糊糊</div>
+            <div class="ex-chip" data-v="播音腔 字正腔圆">播音腔 字正腔圆</div>
+            <div class="ex-chip" data-v="小萝莉 可爱声线">小萝莉 可爱声线</div>
+            <div class="ex-chip" data-v="老年女性 慈祥">老年女性 慈祥</div>
+            <div class="ex-chip" data-v="热血少年 中二">热血少年 中二</div>
+            <div class="ex-chip" data-v="磁性嗓音 霸道总裁">磁性嗓音 霸道总裁</div>
+            <div class="ex-chip" data-v="甜美少女 撒娇">甜美少女 撒娇</div>
+          </div>
+
+          <!-- 音频标签 -->
+          <div class="sl">插入音频标签（点击插入光标处）</div>
+          <div class="snd">
+            <button class="sb" data-t="(笑声)">😆 笑声</button>
+            <button class="sb" data-t="(咳嗽)">😷 咳嗽</button>
+            <button class="sb" data-t="(停顿2秒)">⏸️ 停顿</button>
+            <button class="sb" data-t="(思考)">🤔 思考</button>
+            <button class="sb" data-t="(叹气)">😮‍💨 叹气</button>
+            <button class="sb" data-t="(深呼吸)">😮‍💨 呼吸</button>
+            <button class="sb" data-t="(提高音量)">🔊 大声</button>
+            <button class="sb" data-t="(小声)">🔈 小声</button>
+            <button class="sb" data-t="(语速加快)">⏩ 快速</button>
+            <button class="sb" data-t="(语速变慢)">⏪ 慢速</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ra" id="ra">
+        <div class="rc">
+          <div class="rh">
+            <span class="rt">✓ 合成完成</span>
+            <a class="dl" id="dl" href="#" download="mimo-tts.wav">⬇ 下载</a>
+          </div>
+          <div class="pl">
+            <button class="pb" id="pB">▶</button>
+            <div class="pw">
+              <div class="pbr" id="pBr"><div class="pf" id="pF"></div></div>
+              <div class="td"><span id="ct">0:00</span><span id="ttE">0:00</span></div>
+            </div>
+          </div>
+          <audio id="aud" style="display:none"></audio>
+          <div class="ui" id="uI" style="display:none">
+            <span>提示 <b class="uv" id="uP">-</b></span>
+            <span>补全 <b class="uv" id="uC">-</b></span>
+            <span>总计 <b class="uv" id="uT">-</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="la" id="la">
+        <div class="sl" style="margin-top:6px">请求日志</div>
+        <div class="lb" id="lb"></div>
+      </div>
+
+      <div class="hs" id="hS">
+        <div class="sl" style="margin-top:6px">历史记录</div>
+        <div class="hl" id="hL"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="pnl" style="margin-bottom:18px">
+        <div class="pnl-h"><span class="ic">🔑</span> API 设置</div>
+        <div class="pnl-b">
+          <div class="cg">
+            <div class="cl">API Key</div>
+            <div class="ak-w">
+              <input type="password" class="ak" id="akI" value="">
+              <button class="ak-t" id="akT">👁</button>
+            </div>
+          </div>
+          <div class="cg">
+            <div class="cl">API 地址</div>
+            <input type="text" class="ci" id="ab" value="https://api.xiaomimimo.com" style="font-family:var(--fm);font-size:.74rem;margin-bottom:0">
+          </div>
+          <div class="cg">
+            <div class="cl">模型</div>
+            <select class="sel" id="ms">
+              <option value="mimo-v2-tts">mimo-v2-tts</option>
+            </select>
+          </div>
+          <div class="cg">
+            <label style="display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--t2);cursor:pointer">
+              <input type="checkbox" id="dbg" checked> 显示请求日志
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="pnl">
+        <div class="pnl-h"><span class="ic">⚙️</span> 参数</div>
+        <div class="pnl-b">
+          <div class="cg">
+            <div class="cl">音色</div>
+            <select class="sel" id="vs">
+              <option value="mimo_default">MiMo-默认</option>
+              <option value="default_zh">MiMo-中文女声</option>
+              <option value="default_en">MiMo-英文女声</option>
+            </select>
+          </div>
+          <div class="sep"></div>
+          <div class="cg">
+            <div class="cl">音频格式</div>
+            <select class="sel" id="fs">
+              <option value="wav">WAV（无损）</option>
+              <option value="mp3">MP3（压缩）</option>
+              <option value="pcm">PCM（原始）</option>
+            </select>
+          </div>
+          <div class="sep"></div>
+
+          <div class="sl">请求预览</div>
+          <div class="preview-box" id="preview"></div>
+
+          <button class="gbtn" id="gB"><span class="sp"></span><span class="bt">🎙️ 开始合成</span></button>
+          <div style="margin-top:9px;font-family:var(--fm);font-size:.63rem;color:var(--t3);text-align:center">Ctrl+Enter 快速合成</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tt" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const S={emo:'',voice:'',dia:'',role:'',mode:'speech',hist:[],url:null};
+const txt=$('txt'),cc=$('cc'),cs=$('cs'),akI=$('akI'),ab=$('ab');
+const fs=$('fs'),vs=$('vs'),ms=$('ms');
+const gB=$('gB'),ra=$('ra'),aud=$('aud');
+const pB=$('pB'),pBr=$('pBr'),pF=$('pF');
+const ct=$('ct'),ttE=$('ttE'),dl=$('dl');
+const hS=$('hS'),hL=$('hL');
+const toast=$('toast'),akT=$('akT');
+const dbg=$('dbg'),la=$('la'),lb=$('lb');
+const uI=$('uI'),uP=$('uP'),uC=$('uC'),uT=$('uT');
+const preview=$('preview'),styleBar=$('styleBar');
+
+function toastMsg(m,t=''){toast.textContent=m;toast.className='tt show '+t;setTimeout(()=>toast.className='tt',4e3)}
+function log(m,t=''){if(!dbg.checked)return;la.classList.add('vis');const d=document.createElement('div');d.className='l '+t;d.textContent=`[${new Date().toLocaleTimeString('zh-CN')}] ${m}`;lb.appendChild(d);lb.scrollTop=lb.scrollHeight}
+dbg.addEventListener('change',()=>{la.classList.toggle('vis',dbg.checked)});
+txt.addEventListener('input',()=>{cc.textContent=txt.value.length;updatePreview()});
+cc.textContent=txt.value.length;
+
+// ======== 多选 chip 支持 ========
+function setupMulti(id,k){
+  $(id).addEventListener('click',e=>{
+    const c=e.target.closest('.chip');if(!c)return;
+    const val=c.dataset.v;
+    if(val===''){
+      // "默认/无" 取消所有其他选中
+      $(id).querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+      c.classList.add('on');
+      S[k]='';
+    }else{
+      // 取消"默认/无"
+      $(id).querySelector('.chip[data-v=""]')?.classList.remove('on');
+      c.classList.toggle('on');
+      // 收集所有选中的值
+      const selected=[];
+      $(id).querySelectorAll('.chip.on').forEach(x=>{if(x.dataset.v)selected.push(x.dataset.v)});
+      S[k]=selected.join(' ');
+    }
+    updatePreview();
+  });
+}
+setupMulti('eC','emo');
+setupMulti('vC','voice');
+setupMulti('dC','dia');
+setupMulti('rC','role');
+
+// 模式单选
+$('mC').addEventListener('click',e=>{
+  const c=e.target.closest('.chip');if(!c)return;
+  $('mC').querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on');S.mode=c.dataset.v;updatePreview();
+});
+
+// 自定义示例点击
+document.querySelectorAll('.ex-chip').forEach(b=>b.addEventListener('click',()=>{cs.value=b.dataset.v;updatePreview()}));
+
+// 音频标签插入
+document.querySelectorAll('.sb').forEach(b=>b.addEventListener('click',()=>{const t=b.dataset.t,p=txt.selectionStart,v=txt.value;txt.value=v.slice(0,p)+t+v.slice(p);txt.focus();txt.setSelectionRange(p+t.length,p+t.length);cc.textContent=txt.value.length;updatePreview()}));
+akT.addEventListener('click',()=>{akI.type=akI.type==='password'?'text':'password'});
+
+// ======== 构建完整风格标签 ========
+function buildStyleTag(){
+  const p=[];
+  if(S.emo)p.push(S.emo);
+  if(S.voice)p.push(S.voice);
+  if(S.dia)p.push(S.dia);
+  if(S.role)p.push(S.role);
+  if(cs.value.trim())p.push(cs.value.trim());
+  if(S.mode==='sing')p.push('唱歌');
+  return p.join(' ');
+}
+
+function buildAssistantContent(text){
+  const style=buildStyleTag();
+  if(style)return `<style>${style}</style>${text}`;
+  return text;
+}
+
+// ======== 实时预览 ========
+function updatePreview(){
+  const text=txt.value.trim()||'(空)';
+  const style=buildStyleTag();
+  const assistantContent=buildAssistantContent(text);
+
+  // 风格条
+  if(style){
+    const tags=style.split(' ').filter(Boolean);
+    styleBar.innerHTML=tags.map(t=>`<span class="tag">${t}</span>`).join(' ');
+  }else{
+    styleBar.innerHTML='<span style="color:var(--t3)">（默认音色，无风格修饰）</span>';
+  }
+
+  // 请求预览
+  preview.innerHTML=
+    `<span style="color:var(--t2)">user:</span> 请帮我合成以下内容<br>`+
+    `<span style="color:var(--cy)">assistant:</span> ${assistantContent.slice(0,250).replace(/</g,'&lt;')}${assistantContent.length>250?'...':''}`;
+}
+updatePreview();
+
+function fmt(s){if(isNaN(s))return'0:00';return`${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`}
+
+async function gen(){
+  const text=txt.value.trim();
+  if(!text)return toastMsg('请输入要合成的文本','er');
+  if(!akI.value.trim())return toastMsg('请输入 API Key','er');
+
+  const assistantContent=buildAssistantContent(text);
+
+  const messages=[
+    {role:'user',content:'请帮我合成以下内容'},
+    {role:'assistant',content:assistantContent}
+  ];
+
+  const body={model:ms.value,messages,audio:{format:fs.value,voice:vs.value}};
+
+  log('→ POST /v1/chat/completions','rq');
+  log('assistant: '+assistantContent,'rq');
+  log('Full body: '+JSON.stringify(body),'rq');
+
+  gB.classList.add('ld');gB.disabled=true;
+
+  try{
+    const base=ab.value.replace(/\/+$/,'');
+    let resp;
+    try{
+      resp=await fetch(base+'/v1/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+akI.value.trim()},
+        body:JSON.stringify(body)
+      });
+    }catch(fetchErr){
+      log('请求失败: '+fetchErr.message,'er');
+      throw new Error('网络请求失败（CORS）。终端运行: npx serve -p 3456 -C . 然后访问 http://localhost:3456');
+    }
+
+    log('← HTTP '+resp.status,resp.ok?'rs':'er');
+
+    if(!resp.ok){
+      let errMsg='HTTP '+resp.status;
+      try{const e=await resp.json();errMsg=JSON.stringify(e,null,2);log('Error: '+errMsg,'er')}
+      catch{const t=await resp.text();log('Error: '+t.slice(0,500),'er')}
+      throw new Error(errMsg);
+    }
+
+    const data=await resp.json();
+    log('Response id: '+data.id,'rs');
+
+    const choice=data.choices?.[0];
+    let audioData=null;
+
+    if(choice?.message?.audio?.data){
+      audioData=choice.message.audio.data;
+      log('音频: message.audio.data ('+audioData.length+' chars)','rs');
+    }
+
+    if(!audioData){
+      log('完整响应: '+JSON.stringify(data).slice(0,1000),'er');
+      throw new Error('未获取到音频数据。查看日志。');
+    }
+
+    if(data.usage){
+      uI.style.display='flex';
+      uP.textContent=data.usage.prompt_tokens||'-';
+      uC.textContent=data.usage.completion_tokens||'-';
+      uT.textContent=data.usage.total_tokens||'-';
+    }
+
+    const byteChars=atob(audioData);
+    const byteArr=new Uint8Array(byteChars.length);
+    for(let i=0;i<byteChars.length;i++)byteArr[i]=byteChars.charCodeAt(i);
+    const mime=fs.value==='mp3'?'audio/mpeg':fs.value==='pcm'?'audio/pcm':'audio/wav';
+    const blob=new Blob([byteArr],{type:mime});
+    const url2=URL.createObjectURL(blob);
+
+    if(S.url)URL.revokeObjectURL(S.url);S.url=url2;
+    aud.src=url2;aud.load();
+    dl.href=url2;dl.download=`mimo-tts-${Date.now()}.${fs.value}`;
+    ra.classList.add('vis');
+
+    const styleText=buildStyleTag()||'默认';
+    S.hist.unshift({text:text.slice(0,80),style:styleText,url:url2,time:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}),fmt:fs.value});
+    if(S.hist.length>10){const r=S.hist.pop();URL.revokeObjectURL(r.url)}
+    renderHist();
+
+    toastMsg('合成成功！'+(blob.size/1024).toFixed(1)+'KB','ok');
+  }catch(err){
+    log('异常: '+err.message,'er');
+    toastMsg('失败: '+err.message.slice(0,120),'er');
+  }finally{
+    gB.classList.remove('ld');gB.disabled=false;
+  }
+}
+
+gB.addEventListener('click',gen);
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();gen()}});
+
+let playing=false;
+pB.addEventListener('click',()=>{playing?aud.pause():aud.play()});
+aud.addEventListener('play',()=>{playing=true;pB.textContent='⏸'});
+aud.addEventListener('pause',()=>{playing=false;pB.textContent='▶'});
+aud.addEventListener('ended',()=>{playing=false;pB.textContent='▶';pF.style.width='100%'});
+aud.addEventListener('timeupdate',()=>{if(aud.duration){pF.style.width=(aud.currentTime/aud.duration*100)+'%';ct.textContent=fmt(aud.currentTime)}});
+aud.addEventListener('loadedmetadata',()=>{ttE.textContent=fmt(aud.duration)});
+pBr.addEventListener('click',e=>{if(aud.duration){aud.currentTime=(e.clientX-pBr.getBoundingClientRect().left)/pBr.getBoundingClientRect().width*aud.duration}});
+
+function renderHist(){
+  if(!S.hist.length){hS.classList.remove('vis');return}
+  hS.classList.add('vis');
+  hL.innerHTML=S.hist.map((it,i)=>`<div class="hi" data-i="${i}"><button class="hp" data-i="${i}">▶</button><div class="hf"><div class="ht">${it.text.replace(/</g,'&lt;')}</div><div class="hm">${it.style} · ${it.fmt.toUpperCase()} · ${it.time}</div></div></div>`).join('');
+  hL.querySelectorAll('.hp').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();playH(+b.dataset.i)}));
+  hL.querySelectorAll('.hi').forEach(el=>el.addEventListener('click',()=>playH(+el.dataset.i)));
+}
+function playH(i){const it=S.hist[i];if(!it)return;aud.src=it.url;aud.play();ra.classList.add('vis');dl.href=it.url}
+</script>
+</body>
+</html>
