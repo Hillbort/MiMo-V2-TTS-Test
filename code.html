@@ -148,6 +148,10 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;background:var(--cy
 /* 请求预览 */
 .preview-box{padding:10px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r2);font-family:var(--fm);font-size:.68rem;color:var(--t3);line-height:1.8;margin-bottom:16px;max-height:180px;overflow-y:auto;word-break:break-all}
 
+/* 应用按钮样式 */
+.apply-btn{padding:9px 16px;background:var(--sf3);border:1px solid var(--bd);border-radius:var(--r2);color:var(--t2);font-family:var(--f);font-size:.82rem;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0}
+.apply-btn:hover{border-color:var(--cy);color:var(--cy);background:var(--cy2)}
+
 @media(max-width:600px){.app{padding:18px 14px 60px}.hdr h1{font-size:1.8rem}.pnl-b{padding:15px}.grid{gap:14px}}
 </style>
 </head>
@@ -256,9 +260,12 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;background:var(--cy
             <div class="chip" data-v="sing">🎵 唱歌</div>
           </div>
 
-          <!-- 自定义风格 -->
+          <!-- 自定义风格（修改2：增加"应用"按钮） -->
           <div class="sl">自定义风格描述（追加到上方选择之后，任意自然语言）</div>
-          <input type="text" class="ci" id="cs" placeholder='例："中年男人 粗犷的嗓音"、"刚睡醒 迷迷糊糊"、"播音腔 字正腔圆"'>
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <input type="text" class="ci" id="cs" placeholder='例："中年男人 粗犷嗓音"、"刚睡醒 迷迷糊糊"、"播音腔 字正腔圆"' style="flex:1;margin-bottom:0;">
+            <button class="apply-btn" id="applyCs">应用</button>
+          </div>
           <div class="ex-row">
             <div class="ex-chip" data-v="中年男人 粗犷嗓音">中年男人 粗犷嗓音</div>
             <div class="ex-chip" data-v="刚睡醒 迷迷糊糊">刚睡醒 迷迷糊糊</div>
@@ -358,6 +365,8 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;background:var(--cy
               <option value="mimo_default">MiMo-默认</option>
               <option value="default_zh">MiMo-中文女声</option>
               <option value="default_en">MiMo-英文女声</option>
+              <!-- 修改1：新增男声音色选项 -->
+              <option value="default_zh_male">MiMo-中文男声</option>
             </select>
           </div>
           <div class="sep"></div>
@@ -410,15 +419,12 @@ function setupMulti(id,k){
     const c=e.target.closest('.chip');if(!c)return;
     const val=c.dataset.v;
     if(val===''){
-      // "默认/无" 取消所有其他选中
       $(id).querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
       c.classList.add('on');
       S[k]='';
     }else{
-      // 取消"默认/无"
       $(id).querySelector('.chip[data-v=""]')?.classList.remove('on');
       c.classList.toggle('on');
-      // 收集所有选中的值
       const selected=[];
       $(id).querySelectorAll('.chip.on').forEach(x=>{if(x.dataset.v)selected.push(x.dataset.v)});
       S[k]=selected.join(' ');
@@ -445,6 +451,12 @@ document.querySelectorAll('.ex-chip').forEach(b=>b.addEventListener('click',()=>
 document.querySelectorAll('.sb').forEach(b=>b.addEventListener('click',()=>{const t=b.dataset.t,p=txt.selectionStart,v=txt.value;txt.value=v.slice(0,p)+t+v.slice(p);txt.focus();txt.setSelectionRange(p+t.length,p+t.length);cc.textContent=txt.value.length;updatePreview()}));
 akT.addEventListener('click',()=>{akI.type=akI.type==='password'?'text':'password'});
 
+// ======== 修改2：应用按钮事件监听 ========
+$('applyCs').addEventListener('click',()=>{
+  updatePreview();
+  toastMsg('自定义风格已应用','ok');
+});
+
 // ======== 构建完整风格标签 ========
 function buildStyleTag(){
   const p=[];
@@ -469,7 +481,6 @@ function updatePreview(){
   const style=buildStyleTag();
   const assistantContent=buildAssistantContent(text);
 
-  // 风格条
   if(style){
     const tags=style.split(' ').filter(Boolean);
     styleBar.innerHTML=tags.map(t=>`<span class="tag">${t}</span>`).join(' ');
@@ -477,7 +488,6 @@ function updatePreview(){
     styleBar.innerHTML='<span style="color:var(--t3)">（默认音色，无风格修饰）</span>';
   }
 
-  // 请求预览
   preview.innerHTML=
     `<span style="color:var(--t2)">user:</span> 请帮我合成以下内容<br>`+
     `<span style="color:var(--cy)">assistant:</span> ${assistantContent.slice(0,250).replace(/</g,'&lt;')}${assistantContent.length>250?'...':''}`;
@@ -498,7 +508,8 @@ async function gen(){
     {role:'assistant',content:assistantContent}
   ];
 
-  const body={model:ms.value,messages,audio:{format:fs.value,voice:vs.value}};
+  // 修改3：在audio对象中增加 mode:S.mode
+  const body={model:ms.value,messages,audio:{format:fs.value,voice:vs.value,mode:S.mode}};
 
   log('→ POST /v1/chat/completions','rq');
   log('assistant: '+assistantContent,'rq');
